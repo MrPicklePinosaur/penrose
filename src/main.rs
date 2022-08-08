@@ -1,4 +1,3 @@
-
 #[macro_use]
 extern crate penrose;
 
@@ -12,7 +11,6 @@ use penrose::{
 };
 
 fn main() -> penrose::Result<()> {
-
     let config = Config::default();
     let hooks = vec![];
 
@@ -43,7 +41,7 @@ fn main() -> penrose::Result<()> {
     };
 
     let mut wm = new_xcb_backed_window_manager(config, hooks, logging_error_handler())?;
-    wm.grab_keys_and_run(key_bindings, map!{})?;
+    wm.grab_keys_and_run(key_bindings, map! {})?;
 
     Ok(())
 }

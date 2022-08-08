@@ -2,6 +2,9 @@
 name = "penrose"
 version = "0.1.0"
 edition = "2021"
+authors = ["MrPicklePinosaur"]
+description = "pinosaur's penrose configuration"
+repository = "https://github.com/MrPicklePinosaur/penrose.git"
 
 [dependencies]
 penrose = { version = "0.2.1" }
