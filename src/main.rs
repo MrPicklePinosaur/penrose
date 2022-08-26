@@ -19,6 +19,11 @@ use pino_xrdb::*;
 struct ColorConfig {
     focused_border: String,
     unfocused_border: String,
+    border_px: u32,
+    gap_px: u32,
+    show_bar: bool,
+    top_bar: bool,
+    bar_height: u32,
 }
 
 const PROG_NAME: &str = "penrose";
@@ -32,13 +37,30 @@ fn load_xresources() -> Result<ColorConfig> {
         unfocused_border: xrdb
             .query(PROG_NAME, "unfocused_border")
             .unwrap_or(String::from("#000000")),
+        border_px: xrdb
+            .query(PROG_NAME, "border_px")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(2),
+        gap_px: xrdb
+            .query(PROG_NAME, "gap_px")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(5),
+        show_bar: xrdb
+            .query(PROG_NAME, "show_bar")
+            .and_then(|v| v.parse::<bool>().ok())
+            .unwrap_or(true),
+        top_bar: xrdb
+            .query(PROG_NAME, "top_bar")
+            .and_then(|v| v.parse::<bool>().ok())
+            .unwrap_or(true),
+        bar_height: xrdb
+            .query(PROG_NAME, "bar_height")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(5),
     })
 }
 
 fn main() -> Result<()> {
-    // load config from xresources
-    let config = load_xresources()?;
-
     let hooks = vec![];
     let key_bindings = gen_keybindings! {
 
@@ -78,10 +100,16 @@ fn main() -> Result<()> {
         Layout::floating("[-]"),
     ]);
 
-    // colors
+    // config from xresources
+    let config = load_xresources()?;
     config_builder
         .focused_border(config.focused_border)?
-        .unfocused_border(config.unfocused_border)?;
+        .unfocused_border(config.unfocused_border)?
+        .border_px(config.border_px)
+        .gap_px(config.gap_px)
+        .show_bar(config.show_bar)
+        .top_bar(config.top_bar)
+        .bar_height(config.bar_height);
 
     let config = config_builder.build().unwrap();
     let mut wm = new_xcb_backed_window_manager(config, hooks, logging_error_handler())?;
