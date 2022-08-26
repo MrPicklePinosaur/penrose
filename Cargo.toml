@@ -8,3 +8,5 @@ repository = "https://github.com/MrPicklePinosaur/penrose.git"
 
 [dependencies]
 penrose = { version = "0.2.1" }
+pino_xrdb = { git = "https://github.com/MrPicklePinosaur/pino_xutils" }
+anyhow = "1"

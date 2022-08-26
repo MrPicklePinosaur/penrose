@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate penrose;
 
+use anyhow::Result;
 use penrose::{
     core::{
         bindings::MouseEvent,
@@ -13,11 +14,34 @@ use penrose::{
     xcb::new_xcb_backed_window_manager,
     Backward, Forward, Less, More,
 };
+use pino_xrdb::*;
 
-fn main() -> penrose::Result<()> {
+struct ColorConfig {
+    focused_border: String,
+    unfocused_border: String,
+}
+
+const PROG_NAME: &str = "penrose";
+fn load_xresources() -> Result<ColorConfig> {
+    let xrdb = Xrdb::new()?;
+
+    Ok(ColorConfig {
+        focused_border: xrdb
+            .query(PROG_NAME, "focused_border")
+            .unwrap_or(String::from("#FFFFFF")),
+        unfocused_border: xrdb
+            .query(PROG_NAME, "unfocused_border")
+            .unwrap_or(String::from("#000000")),
+    })
+}
+
+fn main() -> Result<()> {
+    // load config from xresources
+    let config = load_xresources()?;
+
     let hooks = vec![];
-
     let key_bindings = gen_keybindings! {
+
         // basics
         "A-j" => run_internal!(cycle_client, Forward);
         "A-k" => run_internal!(cycle_client, Backward);
@@ -56,8 +80,8 @@ fn main() -> penrose::Result<()> {
 
     // colors
     config_builder
-        .focused_border("#cc241d")?
-        .unfocused_border("#3c3836")?;
+        .focused_border(config.focused_border)?
+        .unfocused_border(config.unfocused_border)?;
 
     let config = config_builder.build().unwrap();
     let mut wm = new_xcb_backed_window_manager(config, hooks, logging_error_handler())?;
