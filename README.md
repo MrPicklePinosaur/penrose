@@ -31,3 +31,10 @@ next install dev git hooks:
 $ just devsetup
 ```
 
+## TODO
+
+- Load options from ron config file
+- Status bar (lemon bar?)
+- Select a specific layout
+- 3 column layout
+

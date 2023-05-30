@@ -51,13 +51,20 @@ use anyhow::Result;
 use penrose::{
     builtin::{
         actions::{exit, modify_with, send_layout_message, spawn},
-        layout::messages::{ExpandMain, IncMain, ShrinkMain},
+        layout::{
+            messages::{ExpandMain, IncMain, ShrinkMain},
+            transformers::{Gaps, ReflectHorizontal},
+            MainAndStack, Monocle,
+        },
     },
     core::{
         bindings::{parse_keybindings_with_xmodmap, KeyEventHandler},
+        layout::LayoutStack,
         Config, WindowManager,
     },
+    extensions::hooks::{add_ewmh_hooks, WindowSwallowing},
     map,
+    x::query::{ClassName, Title},
     x11rb::RustConn,
 };
 use pino_xrdb::*;
@@ -75,8 +82,8 @@ fn raw_keybindings() -> HashMap<String, Box<dyn KeyEventHandler<RustConn>>> {
         "A-Tab" => modify_with(|cs| cs.toggle_tag()),
         "A-S-h" => modify_with(|cs| cs.next_layout()),
         "A-S-l" => modify_with(|cs| cs.previous_layout()),
-        // "A-S-H" => send_layout_message(|| IncAain(1)),
-        // "A-S-L" => send_layout_message(|| IncAain(-1)),
+        "A-i" => send_layout_message(|| IncMain(1)),
+        "A-d" => send_layout_message(|| IncMain(-1)),
         "A-l" => send_layout_message(|| ExpandMain),
         "A-h" => send_layout_message(|| ShrinkMain),
         "A-p" => spawn("dmenu_run"),
@@ -101,6 +108,22 @@ fn raw_keybindings() -> HashMap<String, Box<dyn KeyEventHandler<RustConn>>> {
     raw_bindings
 }
 
+fn layouts() -> LayoutStack {
+    let max_main = 1;
+    let ratio = 0.6;
+    let ratio_step = 0.1;
+    let outer_px = 5;
+    let inner_px = 5;
+
+    stack!(
+        MainAndStack::side(max_main, ratio, ratio_step),
+        Monocle::boxed(),
+        ReflectHorizontal::wrap(MainAndStack::side(max_main, ratio, ratio_step)),
+        MainAndStack::bottom(max_main, ratio, ratio_step)
+    )
+    .map(|layout| Gaps::wrap(layout, outer_px, inner_px))
+}
+
 fn main() -> anyhow::Result<()> {
     // tracing_subscriber::fmt()
     //     .with_env_filter("info")
@@ -111,12 +134,17 @@ fn main() -> anyhow::Result<()> {
     let keybindings = parse_keybindings_with_xmodmap(raw_keybindings())?;
 
     // config from xresources
-    // let config = load_xresources()?;
-    let mut config = Config {
+    let xresources = load_xresources()?;
+    let config = Config {
+        normal_border: xresources.unfocused_border.try_into().unwrap(),
+        focused_border: xresources.focused_border.try_into().unwrap(),
+        border_width: xresources.border_px,
+        default_layouts: layouts(),
+        event_hook: Some(WindowSwallowing::boxed(ClassName("st"))),
         ..Default::default()
     };
 
-    let wm = WindowManager::new(config, keybindings, HashMap::new(), conn)?;
+    let wm = WindowManager::new(add_ewmh_hooks(config), keybindings, HashMap::new(), conn)?;
 
     wm.run()?;
     Ok(())
