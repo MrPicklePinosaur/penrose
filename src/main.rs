@@ -2,6 +2,7 @@
 extern crate penrose;
 
 mod config;
+mod layout;
 
 use std::{collections::HashMap, fs, path::PathBuf};
 
