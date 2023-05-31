@@ -8,6 +8,7 @@ use std::{collections::HashMap, fs, path::PathBuf};
 
 use anyhow::Result;
 use config::WMConfig;
+use layout::ThreeColumn;
 use log::*;
 use penrose::{
     builtin::{
@@ -144,6 +145,7 @@ fn layouts(config: &WMConfig) -> LayoutStack {
     let inner_px = 5;
 
     stack!(
+        ThreeColumn::boxed(),
         MainAndStack::side(max_main, ratio, ratio_step),
         Monocle::boxed(),
         ReflectHorizontal::wrap(MainAndStack::side(max_main, ratio, ratio_step)),
