@@ -1,9 +1,30 @@
 use penrose::Color;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct WMConfig {
     pub colors: Colors,
+    pub status_bar: StatusBar,
+}
+
+impl Default for WMConfig {
+    fn default() -> Self {
+        Self {
+            colors: Colors::default(),
+            status_bar: StatusBar::default(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StatusBar {
+    pub height: u32,
+}
+
+impl Default for StatusBar {
+    fn default() -> Self {
+        Self { height: 12 }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

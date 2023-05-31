@@ -110,7 +110,7 @@ pub fn status_bar<X: XConn>(config: &WMConfig) -> penrose_ui::Result<StatusBar<X
 
     StatusBar::try_new(
         Position::Top,
-        BAR_HEIGHT,
+        config.status_bar.height,
         style.bg.unwrap_or_else(|| 0x000000.into()),
         &[&style.font],
         vec![
