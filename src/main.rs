@@ -1,59 +1,19 @@
 #[macro_use]
 extern crate penrose;
 
-struct ColorConfig {
-    focused_border: String,
-    unfocused_border: String,
-    border_px: u32,
-    gap_px: u32,
-    show_bar: bool,
-    top_bar: bool,
-    bar_height: u32,
-}
+mod config;
 
-const PROG_NAME: &str = "penrose";
-fn load_xresources() -> Result<ColorConfig> {
-    let xrdb = Xrdb::new()?;
-
-    Ok(ColorConfig {
-        focused_border: xrdb
-            .query(PROG_NAME, "focused_border")
-            .unwrap_or(String::from("#FFFFFF")),
-        unfocused_border: xrdb
-            .query(PROG_NAME, "unfocused_border")
-            .unwrap_or(String::from("#000000")),
-        border_px: xrdb
-            .query(PROG_NAME, "border_px")
-            .and_then(|v| v.parse::<u32>().ok())
-            .unwrap_or(2),
-        gap_px: xrdb
-            .query(PROG_NAME, "gap_px")
-            .and_then(|v| v.parse::<u32>().ok())
-            .unwrap_or(5),
-        show_bar: xrdb
-            .query(PROG_NAME, "show_bar")
-            .and_then(|v| v.parse::<bool>().ok())
-            .unwrap_or(true),
-        top_bar: xrdb
-            .query(PROG_NAME, "top_bar")
-            .and_then(|v| v.parse::<bool>().ok())
-            .unwrap_or(true),
-        bar_height: xrdb
-            .query(PROG_NAME, "bar_height")
-            .and_then(|v| v.parse::<u32>().ok())
-            .unwrap_or(5),
-    })
-}
-
-use std::collections::HashMap;
+use std::{collections::HashMap, fs, path::PathBuf};
 
 use anyhow::Result;
+use config::WMConfig;
+use log::*;
 use penrose::{
     builtin::{
         actions::{exit, modify_with, send_layout_message, spawn},
         layout::{
             messages::{ExpandMain, IncMain, ShrinkMain},
-            transformers::{Gaps, ReflectHorizontal},
+            transformers::{Gaps, ReflectHorizontal, ReserveTop},
             MainAndStack, Monocle,
         },
     },
@@ -64,13 +24,32 @@ use penrose::{
     },
     extensions::hooks::{add_ewmh_hooks, WindowSwallowing},
     map,
-    x::query::{ClassName, Title},
+    x::{
+        query::{ClassName, Title},
+        XConn,
+    },
     x11rb::RustConn,
+    Color,
 };
-use pino_xrdb::*;
+use penrose_ui::{
+    bar::{
+        widgets::{
+            amixer_volume, battery_summary, current_date_and_time, wifi_network, ActiveWindowName,
+            CurrentLayout, Workspaces,
+        },
+        Position, StatusBar,
+    },
+    core::TextStyle,
+};
+use serde::{Deserialize, Serialize};
+
+const BAR_HEIGHT: u32 = 8;
+const FONT: &'static str = "Sauce Code Pro Nerd Font";
+
+const PROG_NAME: &str = "penrose";
 // use tracing_subscriber::{self, prelude::*};
 
-fn raw_keybindings() -> HashMap<String, Box<dyn KeyEventHandler<RustConn>>> {
+fn raw_keybindings(config: &WMConfig) -> HashMap<String, Box<dyn KeyEventHandler<RustConn>>> {
     let mut raw_bindings = map! {
         map_keys: |k: &str| k.to_string();
 
@@ -108,7 +87,55 @@ fn raw_keybindings() -> HashMap<String, Box<dyn KeyEventHandler<RustConn>>> {
     raw_bindings
 }
 
-fn layouts() -> LayoutStack {
+// Mostly the example dwm bar from the main repo but recreated here so it's easier to tinker
+// with and add in debug widgets when needed.
+pub fn status_bar<X: XConn>(config: &WMConfig) -> penrose_ui::Result<StatusBar<X>> {
+    let highlight: Color = config.colors.blue;
+    let empty_ws: Color = config.colors.dark_white;
+
+    let style = TextStyle {
+        font: FONT.to_string(),
+        point_size: 8,
+        fg: config.colors.white,
+        bg: Some(config.colors.black),
+        padding: (2.0, 2.0),
+    };
+
+    let padded_style = TextStyle {
+        padding: (4.0, 2.0),
+        ..style.clone()
+    };
+
+    const MAX_ACTIVE_WINDOW_CHARS: usize = 50;
+
+    StatusBar::try_new(
+        Position::Top,
+        BAR_HEIGHT,
+        style.bg.unwrap_or_else(|| 0x000000.into()),
+        &[&style.font],
+        vec![
+            Box::new(Workspaces::new(&style, highlight, empty_ws)),
+            Box::new(CurrentLayout::new(&style)),
+            // Box::new(penrose_bar::widgets::debug::StateSummary::new(style)),
+            Box::new(ActiveWindowName::new(
+                MAX_ACTIVE_WINDOW_CHARS,
+                &TextStyle {
+                    bg: Some(highlight),
+                    padding: (6.0, 4.0),
+                    ..style.clone()
+                },
+                true,
+                false,
+            )),
+            Box::new(wifi_network(&padded_style)),
+            Box::new(battery_summary("BAT0", &padded_style)),
+            // Box::new(amixer_volume("Master", &padded_style)),
+            Box::new(current_date_and_time(&padded_style)),
+        ],
+    )
+}
+
+fn layouts(config: &WMConfig) -> LayoutStack {
     let max_main = 1;
     let ratio = 0.6;
     let ratio_step = 0.1;
@@ -121,7 +148,25 @@ fn layouts() -> LayoutStack {
         ReflectHorizontal::wrap(MainAndStack::side(max_main, ratio, ratio_step)),
         MainAndStack::bottom(max_main, ratio, ratio_step)
     )
-    .map(|layout| Gaps::wrap(layout, outer_px, inner_px))
+    .map(|layout| ReserveTop::wrap(Gaps::wrap(layout, outer_px, inner_px), BAR_HEIGHT))
+}
+
+fn load_config() -> WMConfig {
+    let config_file = match fs::read_to_string(PathBuf::from("config.ron")) {
+        Ok(config_file) => config_file,
+        Err(e) => {
+            warn!("Could not open config file");
+            return WMConfig::default();
+        },
+    };
+    let config = match ron::from_str::<WMConfig>(&config_file) {
+        Ok(config) => config,
+        Err(e) => {
+            warn!("Error parsing config file");
+            return WMConfig::default();
+        },
+    };
+    config
 }
 
 fn main() -> anyhow::Result<()> {
@@ -130,21 +175,28 @@ fn main() -> anyhow::Result<()> {
     //     .finish()
     //     .init();
 
-    let conn = RustConn::new()?;
-    let keybindings = parse_keybindings_with_xmodmap(raw_keybindings())?;
+    let config = load_config();
 
-    // config from xresources
-    let xresources = load_xresources()?;
-    let config = Config {
-        normal_border: xresources.unfocused_border.try_into().unwrap(),
-        focused_border: xresources.focused_border.try_into().unwrap(),
-        border_width: xresources.border_px,
-        default_layouts: layouts(),
+    let conn = RustConn::new()?;
+    let mykeybindings = parse_keybindings_with_xmodmap(raw_keybindings(&config))?;
+
+    let myconfig = Config {
+        // normal_border:
+        // focused_border:
+        // border_width:
+        default_layouts: layouts(&config),
         event_hook: Some(WindowSwallowing::boxed(ClassName("st"))),
         ..Default::default()
     };
 
-    let wm = WindowManager::new(add_ewmh_hooks(config), keybindings, HashMap::new(), conn)?;
+    let wm = WindowManager::new(
+        add_ewmh_hooks(myconfig),
+        mykeybindings,
+        HashMap::new(),
+        conn,
+    )?;
+    let bar = status_bar(&config)?;
+    let wm = bar.add_to(wm);
 
     wm.run()?;
     Ok(())
