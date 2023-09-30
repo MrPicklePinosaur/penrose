@@ -1,7 +1,7 @@
 
 <div align="center">
 
-# penrose
+# PinoWM
 
 pinosaur's wm built using [penrose](https://github.com/sminez/penrose).
 
@@ -9,26 +9,21 @@ pinosaur's wm built using [penrose](https://github.com/sminez/penrose).
 
 ## INSTALLATION
 
-first build `penrose`:
-```
-$ just build
-```
-
-next add the following to your `.xinitrc` or equivalent:
-```
-[PATH_TO_REPO]/target/release/penrose &> ~/.penrose.log
+To build an install `PinoWM` with all required config files:
+```sh
+just install
 ```
 
 ## SETUP FOR DEVELOPEMENT
 
-ensure that you have the rust nightly toolchain (nightly clippy and rustfmt features ares used):
-```
-$ rustup install nightly
+Ensure that you have the rust nightly toolchain (nightly clippy and rustfmt features ares used):
+```sh
+rustup install nightly
 ```
 
 next install dev git hooks:
-```
-$ just devsetup
+```sh
+just devsetup
 ```
 
 ## TODO
@@ -36,5 +31,4 @@ $ just devsetup
 - Load options from ron config file
 - Status bar (lemon bar?)
 - Select a specific layout
-- 3 column layout
 

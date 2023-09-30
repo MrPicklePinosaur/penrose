@@ -1,0 +1,7 @@
+[Desktop Entry]
+Version=1.0
+Name=PinoWM
+Comment=This session logs you into Penrose
+Exec=pinowm
+Type=Application
+DesktopNames=PinoWM

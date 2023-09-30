@@ -1,6 +1,8 @@
 use penrose::Color;
 use serde::{Deserialize, Serialize};
 
+const DEFAULT_FONT: &'static str = "Sauce Code Pro Nerd Font";
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WMConfig {
     pub colors: Colors,
@@ -17,13 +19,30 @@ impl Default for WMConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct FontStyle {
+    pub font: String,
+    pub size: usize,
+    pub fg: Color,
+    pub bg: Color,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct StatusBar {
     pub height: u32,
+    pub font: FontStyle,
 }
 
 impl Default for StatusBar {
     fn default() -> Self {
-        Self { height: 12 }
+        Self {
+            height: 12,
+            font: FontStyle {
+                font: DEFAULT_FONT.to_string(),
+                size: 8,
+                fg: Color::new_from_hex(0xB5BFE2),
+                bg: Color::new_from_hex(0x51576D),
+            }
+        }
     }
 }
 

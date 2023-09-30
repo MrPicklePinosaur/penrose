@@ -68,7 +68,7 @@ fn raw_keybindings(config: &WMConfig) -> HashMap<String, Box<dyn KeyEventHandler
         "A-l" => send_layout_message(|| ExpandMain),
         "A-h" => send_layout_message(|| ShrinkMain),
         "A-p" => spawn("dmenu_run"),
-        "A-S-Return" => spawn("st"),
+        "A-S-Return" => spawn("alacritty"),
         "A-S-q" => exit(),
 
         // screen stuff
